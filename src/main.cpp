@@ -11,8 +11,7 @@ int main(int argc, char **argv)
     ros::start();
 
     ros::NodeHandle node;
-    MapGenerator mapgen;
-    
+    MapGenerator mapgen(node);
     
     
     ros::Rate r(30);

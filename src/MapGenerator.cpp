@@ -3,64 +3,52 @@
 
 void MapGenerator::Refresh()
 {
-    bool success;
-
-    success = tlistener.waitForTransform("/kitti/World", "/kitti/Velodyne", ros::Time(0), ros::Duration(0.1));
-    if (success) {
-        tlistener.lookupTransform("/kitti/World", "/kitti/Velodyne", ros::Time(0), ctv);
-        pcl_ros::transformAsMatrix (ctv, cTv); 
-    }  
-
-    if (Velo_received){
-        pcl::transformPointCloud (*velo_cloud, *velo_cloud, EST_pose*cTv);
-        //ICP between merged_cloud and velo_cloud
-        if (ICP_start) VCICP(merged_cloud, velo_cloud);
-        //merge point clouds
-        (*merged_cloud) += (*velo_cloud);
-        //publish map and poses
-        MapPub.PublishMap(merged_cloud,1);
-        MapPub.PublishPose(ODO_pose,1);
-        MapPub.PublishPose(EST_pose,3);
-        Velo_received = false;
-        ICP_start = true;
-        cout<<"Map has been updated"<<endl;
-    }
+    read_velodyne(str_path_+"sequences/00/velodyne/",data_count);
+    pcl::transformPointCloud (*velo_cloud, *velo_cloud, EST_pose*cTv);
+    //ICP between merged_cloud and velo_cloud
+    VCICP(merged_cloud, velo_cloud);
+    //merge point clouds
+    (*merged_cloud) += (*velo_cloud);
+    //publish map and poses
+    MapPub.PublishMap(merged_cloud,1);
+    MapPub.PublishPose(ODO_pose,1);
+    MapPub.PublishPose(EST_pose,3);
+    cout<<"Map has been updated"<<endl;
     
+    data_count++;
 }
 
-void MapGenerator::VeloPtsCallback(const sensor_msgs::PointCloud2::ConstPtr& msg)
+void MapGenerator::read_velodyne(std::string fname, int idx)
 {
-    pcl::PCLPointCloud2 pcl_pc2;
-    pcl_conversions::toPCL(*msg,pcl_pc2);
-    pcl::fromPCLPointCloud2(pcl_pc2,*velo_cloud);
-    //pcl::transformPointCloud (*velo_cloud, *velo_cloud, wTc.inverse());
-   
-    if (velo_cloud->points.size()>0){
-        bool success = tlistener.waitForTransform("/kitti/World", "/kitti/Current", ros::Time(0), ros::Duration(0.1));
-        if (success) {
-            tlistener.lookupTransform("/kitti/World", "/kitti/Current", ros::Time(0), wtb);
-            if(velo_time!=wtb.stamp_){
-                cout<<"Velodyne input: "<<velo_cloud->points.size()<<endl;
-                pcl_ros::transformAsMatrix (wtb, ODO_raw);
-                mTfBr.sendTransform(tf::StampedTransform(wtb,ros::Time::now(), "/CamLoc/World", "/CamLoc/Camera"));
-                Velo_received = true;
-                velo_time = wtb.stamp_;    
-                if(Pose_started){
-                    EST_pose = EST_pose*ODO_pose.inverse()*ODO_raw;
-                    ODO_pose = ODO_raw;
-//                    ODO_pose = ODO_raw;
-//                    EST_pose = ODO_raw;
-                }
-                else{
-                    EST_pose = Matrix4f::Identity();
-                    ODO_pose = Matrix4f::Identity();
-                    Pose_started = true;
-                }
-                
-                
-            } 
-        }
-    }
+  // allocate 4 MB buffer (only ~130*4*4 KB are needed)
+  int32_t num = 1000000;
+  float *data = (float*)malloc(num*sizeof(float));
+
+  // pointers
+  float *px = data+0;
+  float *py = data+1;
+  float *pz = data+2;
+  //float *pr = data+3;
+
+  // load point cloud
+  FILE *stream;
+  stream = fopen (fname.c_str(),"rb");
+  velo_cloud->clear();
+  num = fread(data,sizeof(float),num,stream)/4;
+  for (int32_t i=0; i<num; i++) {
+    velo_cloud->points.push_back(pcl::PointXYZ(*px,*py,*pz));
+    px+=4; py+=4; pz+=4; //pr+=4;
+  }
+  fclose(stream);
+
+}
+
+void MapGenerator::read_ctv(std::string fname)
+{
+
+}
+void MapGenerator::read_poses(std::string fname)
+{
 
 }
 
@@ -96,35 +84,6 @@ void MapGenerator::VCICP(pcl::PointCloud<pcl::PointXYZ>::Ptr& tgt_points,
     {
         //cout<<"ICP iteration: "<<i<<endl;
         CorrespondenceUpdate(tgt_points,src_filtered,i,LPDoctree);
-        
-//        //initial transformation
-//        MatrixXf A = MatrixXf::Zero(iv_corr.i_idx.size()*4,16);
-//        MatrixXf b = MatrixXf::Zero(iv_corr.i_idx.size()*4,1);
-//        for (size_t iter1 = 0; iter1 < iv_corr.i_idx.size(); ++iter1)
-//        {
-//            int idx1 = iter1*4;
-//            for (size_t iter2 = 0; iter2 < 4; ++iter2)
-//            {
-//                int idx2 = iter2*4;                
-//                A(idx1+iter2,idx2) = src_filtered->points[iv_corr.i_idx[iter1]].x;
-//                A(idx1+iter2,idx2+1) = src_filtered->points[iv_corr.i_idx[iter1]].y;
-//                A(idx1+iter2,idx2+2) = src_filtered->points[iv_corr.i_idx[iter1]].z;
-//                A(idx1+iter2,idx2+3) = 1;
-//            }
-//            b(idx1,0) = tgt_points->points[iv_corr.v_idx[iter1]].x;
-//            b(idx1+1,0) = tgt_points->points[iv_corr.v_idx[iter1]].y;
-//            b(idx1+2,0) = tgt_points->points[iv_corr.v_idx[iter1]].z;
-//            b(idx1+3,0) = 1;
-//        }
-//        MatrixXf x_solution = MatrixXf::Zero(16,1);
-//        x_solution =  A.jacobiSvd(ComputeThinU | ComputeThinV).solve(b);
-//        Matrix4f Init_S;
-//        Init_S << x_solution(0,0),x_solution(1,0),x_solution(2,0),x_solution(3,0),x_solution(4,0),x_solution(5,0),
-//                  x_solution(6,0),x_solution(7,0),x_solution(8,0),x_solution(9,0),x_solution(10,0),x_solution(11,0),
-//                  x_solution(12,0),x_solution(13,0),x_solution(14,0),x_solution(15,0); 
-//        cout<<"init S: "<<Init_S<<endl;
-//        pcl::transformPointCloud (*src_filtered, *src_filtered, Init_S);//transform c_cam
-
 
         S = Optimization(tgt_points,src_filtered,10);
         pcl::transformPointCloud (*src_filtered, *src_filtered, S);//transform c_cam

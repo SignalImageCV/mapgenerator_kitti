@@ -53,14 +53,17 @@ struct _image_velo_correspondence {
 class MapGenerator
 {
 public:
-    MapGenerator():
+    MapGenerator(ros::NodeHandle node):
     resolution(1.0f), Nmin(10), Nsigma(3.0f), tmin(0.1f), tmax(0.5f), max_iter(50),
     velo_cloud(new pcl::PointCloud<pcl::PointXYZ>),
     merged_cloud(new pcl::PointCloud<pcl::PointXYZ>),
-    Velo_received(false), ICP_start(false), Pose_started(false)
+    data_count(0)
     {
-        //Set Subscriber
-        sub_veloptcloud = nh.subscribe("/kitti/velodyne_points", 1, &MapGenerator::VeloPtsCallback, this); 
+        node.param("data_path", str_path_, std::string("/var/data/kitti/dataset/"));
+        this->nh = node;
+        
+        read_ctv(str_path_+"sequences/00/calib.txt");
+        read_poses(str_path_+"poses/00.txt");
     }
 
     ~MapGenerator(){
@@ -74,30 +77,18 @@ public:
 private:
     //for ros subscription
     ros::NodeHandle nh;
-    ros::Subscriber sub_veloptcloud;
-    ros::Publisher publisher;
-    tf::TransformListener tlistener;
-    ros::Time velo_time;
-
-    //for broadcast    
-    tf::TransformBroadcaster mTfBr;
-
+    
     //input data
     pcl::PointCloud<pcl::PointXYZ>::Ptr velo_cloud;
     tf::StampedTransform wtb;
     tf::StampedTransform ctv;
     Matrix4f ODO_pose;
-    Matrix4f ODO_raw;
     Matrix4f EST_pose;
     Matrix4f cTv;
-    bool Pose_started;
 
     //output
     pcl::PointCloud<pcl::PointXYZ>::Ptr merged_cloud;
 
-    //Callbacks
-    void VeloPtsCallback(const sensor_msgs::PointCloud2::ConstPtr& msg);
-    bool Velo_received; 
 
     //MapPublisher
     MapPublisher MapPub;
@@ -145,9 +136,16 @@ private:
     float Nsigma;
     float resolution;
     size_t max_iter;
-    bool ICP_start;
     //g2o::Sim3 g2oS;
     image_velo_correspondence iv_corr;
+
+    //kitto 
+    void read_velodyne(std::string fname, int idx);
+    void read_ctv(std::string fname);
+    void read_poses(std::string fname);
+
+    int data_count;
+    std::string str_path_;
 
 };
 
