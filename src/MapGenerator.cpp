@@ -3,15 +3,28 @@
 
 void MapGenerator::Refresh()
 {
+
+    wtb.setIdentity();
+    mTfBr.sendTransform(tf::StampedTransform(wtb,ros::Time::now(), "/CamLoc/World", "/CamLoc/Camera"));
+
     read_velodyne(str_path_+"sequences/00/velodyne/",data_count);
-    pcl::transformPointCloud (*velo_cloud, *velo_cloud, EST_pose*cTv);
-    //ICP between merged_cloud and velo_cloud
-    VCICP(merged_cloud, velo_cloud);
-    //merge point clouds
-    (*merged_cloud) += (*velo_cloud);
+
+
+    if(data_count>0){
+        EST_pose = EST_pose*poses[data_count-1].inverse()*poses[data_count];
+        pcl::transformPointCloud (*velo_cloud, *velo_cloud, EST_pose*cTv);
+        //ICP between merged_cloud and velo_cloud
+        VCICP(merged_cloud, velo_cloud);
+    }
+    else{
+        EST_pose = poses[data_count];
+        cout<<EST_pose<<endl;
+        pcl::transformPointCloud (*velo_cloud, *velo_cloud, EST_pose*cTv);
+    }    
+    (*merged_cloud) += (*velo_cloud); //merge point clouds
     //publish map and poses
     MapPub.PublishMap(merged_cloud,1);
-    MapPub.PublishPose(ODO_pose,1);
+    MapPub.PublishPose(poses[data_count],1);
     MapPub.PublishPose(EST_pose,3);
     cout<<"Map has been updated"<<endl;
     
@@ -32,6 +45,10 @@ void MapGenerator::read_velodyne(std::string fname, int idx)
 
   // load point cloud
   FILE *stream;
+  char str[7];
+  snprintf (str, 7, "%06d", idx);
+  fname = fname+str+".bin";
+  cout<<fname<<endl;
   stream = fopen (fname.c_str(),"rb");
   velo_cloud->clear();
   num = fread(data,sizeof(float),num,stream)/4;
@@ -45,11 +62,48 @@ void MapGenerator::read_velodyne(std::string fname, int idx)
 
 void MapGenerator::read_ctv(std::string fname)
 {
+    FILE *fl;
+    char s[50];
+    int count = 0;
 
+    if ((fl = fopen(fname.c_str(), "r")) != NULL){
+        while(fscanf(fl, "%s", &s) != EOF){
+            if(count >0){
+                int i = (count-1)/4;
+                int j = (count-1)%4;
+                cTv(i,j) = atof(s);
+                count++;
+            }
+            if(!strcmp(s,"Tr:")){
+                count = 1;
+            }
+        }
+    }
+    cout<<cTv<<endl;
 }
+
 void MapGenerator::read_poses(std::string fname)
 {
+    FILE *fl;
+    char s[50];
+    int count = 0;
+    poses.reserve(4541);
+    Matrix4f tmp = Matrix4f::Identity();
 
+    if ((fl = fopen(fname.c_str(), "r")) != NULL){
+        while(fscanf(fl, "%s", &s) != EOF){
+            int i = count/4;
+            int j = count%4;
+            tmp(i,j) = atof(s);
+            count++;
+            if(count == 12){
+                count = 0;
+                poses.push_back(tmp);
+                tmp = Matrix4f::Identity();
+                
+            }
+        }
+    }
 }
 
 void MapGenerator::VCICP(pcl::PointCloud<pcl::PointXYZ>::Ptr& tgt_points,

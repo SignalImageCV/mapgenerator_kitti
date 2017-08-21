@@ -2,6 +2,7 @@
 #define MAPGENERATOR_H
 
 #include <iostream>
+#include <sstream>
 #include <Eigen/Dense>
 #include <Eigen/Geometry> 
 #include <ros/ros.h>
@@ -53,17 +54,21 @@ struct _image_velo_correspondence {
 class MapGenerator
 {
 public:
-    MapGenerator(ros::NodeHandle node):
+    MapGenerator(ros::NodeHandle node, ros::NodeHandle private_nh):
     resolution(1.0f), Nmin(10), Nsigma(3.0f), tmin(0.1f), tmax(0.5f), max_iter(50),
     velo_cloud(new pcl::PointCloud<pcl::PointXYZ>),
     merged_cloud(new pcl::PointCloud<pcl::PointXYZ>),
     data_count(0)
     {
-        node.param("data_path", str_path_, std::string("/var/data/kitti/dataset/"));
+        private_nh.param("data_path", str_path_, std::string("/var/data/kitti/dataset/"));
         this->nh = node;
         
+        cTv = Matrix4f::Identity();
         read_ctv(str_path_+"sequences/00/calib.txt");
         read_poses(str_path_+"poses/00.txt");
+       
+        EST_pose = Matrix4f::Identity();
+
     }
 
     ~MapGenerator(){
@@ -78,12 +83,14 @@ private:
     //for ros subscription
     ros::NodeHandle nh;
     
+    //for broadcast    
+    tf::TransformBroadcaster mTfBr;
+    
     //input data
     pcl::PointCloud<pcl::PointXYZ>::Ptr velo_cloud;
-    tf::StampedTransform wtb;
-    tf::StampedTransform ctv;
-    Matrix4f ODO_pose;
     Matrix4f EST_pose;
+    vector<Matrix4f> poses;
+    tf::StampedTransform wtb;
     Matrix4f cTv;
 
     //output
@@ -139,13 +146,20 @@ private:
     //g2o::Sim3 g2oS;
     image_velo_correspondence iv_corr;
 
-    //kitto 
+    //kitti 
     void read_velodyne(std::string fname, int idx);
     void read_ctv(std::string fname);
     void read_poses(std::string fname);
 
     int data_count;
     std::string str_path_;
+
+    string intToString(int n)
+    {
+        stringstream s;
+        s << n;
+        return s.str();
+    }
 
 };
 
