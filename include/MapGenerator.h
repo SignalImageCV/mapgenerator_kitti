@@ -71,9 +71,7 @@ public:
 
     }
 
-    ~MapGenerator(){
-    //save velodyne point clouds
-    pcl::io::savePLYFileASCII ("merged_icp3.ply", *merged_cloud);
+    ~MapGenerator(){       
     }
 
     //publish
@@ -95,7 +93,6 @@ private:
 
     //output
     pcl::PointCloud<pcl::PointXYZ>::Ptr merged_cloud;
-
 
     //MapPublisher
     MapPublisher MapPub;

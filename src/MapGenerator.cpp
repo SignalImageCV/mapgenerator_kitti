@@ -27,8 +27,37 @@ void MapGenerator::Refresh()
     MapPub.PublishPose(poses[data_count],1);
     MapPub.PublishPose(EST_pose,3);
     cout<<"Map has been updated"<<endl;
-    
+ 
     data_count++;
+
+//    if(data_count%3 == 0){   
+        //save velodyne point clouds
+        std::string fname;
+        char str[7];
+        snprintf (str, 7, "%06d", data_count);
+        fname = fname+str+".ply";
+        pcl::io::savePLYFileASCII (fname.c_str(), *merged_cloud);
+        merged_cloud->clear();
+        (*merged_cloud) = (*velo_cloud);
+//    }
+
+    //write poses
+    ofstream poses_file("poses.txt", std::ios::app);
+    if (poses_file.is_open())poses_file << EST_pose.block<3,4>(0,0) << '\n';
+    poses_file.close();
+
+//    float *data = (float*)malloc(12*sizeof(float));
+//    for (int32_t i=0; i<12; i++){
+//        int u = i/4;
+//        int v = i%4;
+//        float *px;
+//        px = data+i;
+//        *px = EST_pose(u,v);
+//    }
+//    poses_file = fopen ("poses.txt","wb");
+//    fwrite (data , sizeof(float), 12, poses_file);
+//    fclose (poses_file);
+    
 }
 
 void MapGenerator::read_velodyne(std::string fname, int idx)
@@ -128,11 +157,11 @@ void MapGenerator::VCICP(pcl::PointCloud<pcl::PointXYZ>::Ptr& tgt_points,
 
     Matrix4f S_sum=Matrix4f::Identity();
     Matrix4f S=Matrix4f::Identity();
-    S(2,3) -= 0.1f;
-    S(0,3) += 0.01f;
-    pcl::transformPointCloud (*src_filtered, *src_filtered, S);//transform c_cam
-    S_sum = S*S_sum;
-    S=Matrix4f::Identity(); 
+//    S(2,3) -= 0.1f;
+//    S(0,3) += 0.01f;
+//    pcl::transformPointCloud (*src_filtered, *src_filtered, S);//transform c_cam
+//    S_sum = S*S_sum;
+//    S=Matrix4f::Identity(); 
     //ICP iterations
     for (size_t i = 0; i < max_iter; i++)
     {
@@ -143,7 +172,7 @@ void MapGenerator::VCICP(pcl::PointCloud<pcl::PointXYZ>::Ptr& tgt_points,
         pcl::transformPointCloud (*src_filtered, *src_filtered, S);//transform c_cam
         S_sum = S*S_sum;
         cout<<S<<endl;
-        if((abs(S(0,3))+abs(S(1,3))+abs(S(2,3)))<0.005)break;
+        if((abs(S(0,3))+abs(S(1,3))+abs(S(2,3)))<0.003)break;
     }
     pcl::transformPointCloud (*src_points, *velo_cloud, S_sum);//transform c_cam
     EST_pose = EST_pose*S_sum; 
@@ -306,7 +335,7 @@ Matrix4f MapGenerator::Optimization(const pcl::PointCloud<pcl::PointXYZ>::Ptr& v
     cout<<"Number of nBad is: "<<nBad<<endl;
     int nMoreIterations;
     if(nBad>0){
-        nMoreIterations=10;
+        nMoreIterations=5;
         if((max_size/nBad)<3)//((max_size-nBad*2)<50)//((max_size/nBad)<2.1)//(nBad>500)//
         {
             cout<<"Number of nBad is large"<<endl;
