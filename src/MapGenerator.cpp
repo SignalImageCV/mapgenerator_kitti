@@ -43,7 +43,20 @@ void MapGenerator::Refresh()
 
     //write poses
     ofstream poses_file("poses.txt", std::ios::app);
-    if (poses_file.is_open())poses_file << EST_pose.block<3,4>(0,0) << '\n';
+    if (poses_file.is_open()){
+        poses_file << EST_pose(0,0) << ' ';
+        poses_file << EST_pose(0,1) << ' ';
+        poses_file << EST_pose(0,2) << ' ';
+        poses_file << EST_pose(0,3) << '\n';
+        poses_file << EST_pose(1,0) << ' ';
+        poses_file << EST_pose(1,1) << ' ';
+        poses_file << EST_pose(1,2) << ' ';
+        poses_file << EST_pose(1,3) << '\n';
+        poses_file << EST_pose(2,0) << ' ';
+        poses_file << EST_pose(2,1) << ' ';
+        poses_file << EST_pose(2,2) << ' ';
+        poses_file << EST_pose(2,3) << '\n';
+    }
     poses_file.close();
 
 //    float *data = (float*)malloc(12*sizeof(float));
@@ -172,7 +185,12 @@ void MapGenerator::VCICP(pcl::PointCloud<pcl::PointXYZ>::Ptr& tgt_points,
         pcl::transformPointCloud (*src_filtered, *src_filtered, S);//transform c_cam
         S_sum = S*S_sum;
         cout<<S<<endl;
-        if((abs(S(0,3))+abs(S(1,3))+abs(S(2,3)))<0.003)break;
+        float roll = atan2(S(2,1), S(2,2));
+        float pitch = asin(S(2,0));
+        float yaw = -atan2(S(1,0), S(0,0));
+        if((abs(S(0,3))+abs(S(1,3))+abs(S(2,3)))<0.001){
+            if((abs(roll)+abs(pitch)+abs(yaw))<0.001)break;
+        }
     }
     pcl::transformPointCloud (*src_points, *velo_cloud, S_sum);//transform c_cam
     EST_pose = EST_pose*S_sum; 
@@ -218,6 +236,7 @@ Matrix4f MapGenerator::Optimization(const pcl::PointCloud<pcl::PointXYZ>::Ptr& v
     linearSolver = new g2o::LinearSolverDense<g2o::BlockSolverX::PoseMatrixType>();
     g2o::BlockSolverX * solver_ptr = new g2o::BlockSolverX(linearSolver);
     g2o::OptimizationAlgorithmLevenberg* solver = new g2o::OptimizationAlgorithmLevenberg(solver_ptr);
+//    solver->setUserLambdaInit(0.001f);
     optimizer.setAlgorithm(solver);
 
 
