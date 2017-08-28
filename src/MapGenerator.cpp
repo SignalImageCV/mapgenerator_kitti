@@ -12,9 +12,16 @@ void MapGenerator::Refresh()
 
     if(data_count>0){
         EST_pose = EST_pose*poses[data_count-1].inverse()*poses[data_count];
-        pcl::transformPointCloud (*velo_cloud, *velo_cloud, EST_pose*cTv);
+        Matrix4f EST_init = EST_pose;
+        //pcl::transformPointCloud (*velo_cloud, *velo_cloud, EST_pose*cTv);
+        pcl::transformPointCloud (*velo_cloud, *velo_cloud, cTv);
+        pcl::transformPointCloud (*merged_cloud, *merged_cloud, EST_init.inverse());
+        
         //ICP between merged_cloud and velo_cloud
         VCICP(merged_cloud, velo_cloud);
+
+        pcl::transformPointCloud (*velo_cloud, *velo_cloud, EST_pose);
+        pcl::transformPointCloud (*merged_cloud, *merged_cloud, EST_init);
     }
     else{
         EST_pose = poses[data_count];
@@ -30,7 +37,7 @@ void MapGenerator::Refresh()
  
     data_count++;
 
-//    if(data_count%3 == 0){   
+//    if(data_count%5 == 0){   
         //save velodyne point clouds
         std::string fname;
         char str[7];
@@ -192,7 +199,7 @@ void MapGenerator::VCICP(pcl::PointCloud<pcl::PointXYZ>::Ptr& tgt_points,
             if((abs(roll)+abs(pitch)+abs(yaw))<0.001)break;
         }
     }
-    pcl::transformPointCloud (*src_points, *velo_cloud, S_sum);//transform c_cam
+    //pcl::transformPointCloud (*src_points, *velo_cloud, S_sum);//transform c_cam
     EST_pose = EST_pose*S_sum; 
 }
 
@@ -250,14 +257,6 @@ Matrix4f MapGenerator::Optimization(const pcl::PointCloud<pcl::PointXYZ>::Ptr& v
     vSim3->setEstimate(g2oS_init);
     vSim3->setId(0);
     vSim3->setFixed(false);
-//    vSim3->_principle_point1[0] = K(2,0);
-//    vSim3->_principle_point1[1] = K(2,1);
-//    vSim3->_focal_length1[0] = K(0,0);
-//    vSim3->_focal_length1[1] = K(1,1);
-//    vSim3->_principle_point2[0] = K(2,0);
-//    vSim3->_principle_point2[1] = K(2,1);
-//    vSim3->_focal_length2[0] = K(0,0);
-//    vSim3->_focal_length2[1] = K(1,1);
     optimizer.addVertex(vSim3);
 
     //Set map point vertices
@@ -331,56 +330,62 @@ Matrix4f MapGenerator::Optimization(const pcl::PointCloud<pcl::PointXYZ>::Ptr& v
     optimizer.initializeOptimization();
     optimizer.optimize(5);
     
-    // Check inliers
-    int nBad=0;
-    for(size_t i=0; i<vpEdges12.size();i++)
-    {
-        g2o::EdgeSim3ProjectXYZ* e12 = vpEdges12[i];
-        g2o::EdgeInverseSim3ProjectXYZ* e21 = vpEdges21[i];
-        if(!e12 || !e21)
-            continue;
 
-        if(e12->chi2()>th2 || e21->chi2()>th2)
-        {
-            size_t idx = vnIndexEdge[i];
-            optimizer.removeEdge(e12);
-            optimizer.removeEdge(e21);
-            vpEdges12[i]=NULL;
-            vpEdges21[i]=NULL;
-            nBad++;
-        }
-    }
+    // Recover optimized Sim3
+    g2o::VertexSim3Expmap* vSim3_recov = static_cast<g2o::VertexSim3Expmap*>(optimizer.vertex(0));
+    g2o::Sim3 g2oS12= vSim3_recov->estimate();      
+    return Sim3toMat(g2oS12);
 
-    cout<<"Number of nBad is: "<<nBad<<endl;
-    int nMoreIterations;
-    if(nBad>0){
-        nMoreIterations=5;
-        if((max_size/nBad)<3)//((max_size-nBad*2)<50)//((max_size/nBad)<2.1)//(nBad>500)//
-        {
-            cout<<"Number of nBad is large"<<endl;
-            nMoreIterations=-1;
-        }
-    }
-    else
-        nMoreIterations=5;
+//    // Check inliers
+//    int nBad=0;
+//    for(size_t i=0; i<vpEdges12.size();i++)
+//    {
+//        g2o::EdgeSim3ProjectXYZ* e12 = vpEdges12[i];
+//        g2o::EdgeInverseSim3ProjectXYZ* e21 = vpEdges21[i];
+//        if(!e12 || !e21)
+//            continue;
+
+//        if(e12->chi2()>th2 || e21->chi2()>th2)
+//        {
+//            size_t idx = vnIndexEdge[i];
+//            optimizer.removeEdge(e12);
+//            optimizer.removeEdge(e21);
+//            vpEdges12[i]=NULL;
+//            vpEdges21[i]=NULL;
+//            nBad++;
+//        }
+//    }
+
+//    cout<<"Number of nBad is: "<<nBad<<endl;
+//    int nMoreIterations;
+//    if(nBad>0){
+//        nMoreIterations=5;
+//        if((max_size/nBad)<3)//((max_size-nBad*2)<50)//((max_size/nBad)<2.1)//(nBad>500)//
+//        {
+//            cout<<"Number of nBad is large"<<endl;
+//            nMoreIterations=-1;
+//        }
+//    }
+//    else
+//        nMoreIterations=5;
 
 
 
-    if(nMoreIterations>0){
-        cout<<nMoreIterations<<" more optimizations"<<endl;
-        // Optimize again only with inliers
-        optimizer.initializeOptimization();
-        optimizer.optimize(nMoreIterations);
-        // Recover optimized Sim3
-        g2o::VertexSim3Expmap* vSim3_recov = static_cast<g2o::VertexSim3Expmap*>(optimizer.vertex(0));
-        g2o::Sim3 g2oS12= vSim3_recov->estimate();      
-        return Sim3toMat(g2oS12);
-    }
-    else{
+//    if(nMoreIterations>0){
+//        cout<<nMoreIterations<<" more optimizations"<<endl;
+//        // Optimize again only with inliers
+//        optimizer.initializeOptimization();
+//        optimizer.optimize(nMoreIterations);
+//        // Recover optimized Sim3
 //        g2o::VertexSim3Expmap* vSim3_recov = static_cast<g2o::VertexSim3Expmap*>(optimizer.vertex(0));
 //        g2o::Sim3 g2oS12= vSim3_recov->estimate();      
 //        return Sim3toMat(g2oS12);
-        return Matrix4f::Identity();
-    }
+//    }
+//    else{
+////        g2o::VertexSim3Expmap* vSim3_recov = static_cast<g2o::VertexSim3Expmap*>(optimizer.vertex(0));
+////        g2o::Sim3 g2oS12= vSim3_recov->estimate();      
+////        return Sim3toMat(g2oS12);
+//        return Matrix4f::Identity();
+//    }
     
 }

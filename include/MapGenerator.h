@@ -55,7 +55,7 @@ class MapGenerator
 {
 public:
     MapGenerator(ros::NodeHandle node, ros::NodeHandle private_nh):
-    resolution(1.0f), Nmin(10), Nsigma(3.0f), tmin(0.1f), tmax(0.5f), max_iter(50),
+    resolution(1.0f), Nmin(10), Nsigma(3.0f), tmin(0.1f), tmax(1.0f), max_iter(50),
     velo_cloud(new pcl::PointCloud<pcl::PointXYZ>),
     merged_cloud(new pcl::PointCloud<pcl::PointXYZ>),
     data_count(0)
