@@ -57,6 +57,9 @@ public:
     MapGenerator(ros::NodeHandle node, ros::NodeHandle private_nh):
     resolution(1.0f), Nmin(10), Nsigma(3.0f), tmin(0.1f), tmax(1.0f), max_iter(50),
     velo_cloud(new pcl::PointCloud<pcl::PointXYZ>),
+    cloud1(new pcl::PointCloud<pcl::PointXYZ>),
+    cloud2(new pcl::PointCloud<pcl::PointXYZ>),
+    cloud3(new pcl::PointCloud<pcl::PointXYZ>),
     merged_cloud(new pcl::PointCloud<pcl::PointXYZ>)
     {
         private_nh.param("data_path", str_path_, std::string("/var/data/kitti/dataset/"));
@@ -113,6 +116,9 @@ private:
     
     //input data
     pcl::PointCloud<pcl::PointXYZ>::Ptr velo_cloud;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud1;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud2;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud3;
     Matrix4f EST_pose;
     vector<Matrix4f> poses;
     tf::StampedTransform wtb;

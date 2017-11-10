@@ -27,14 +27,41 @@ void MapGenerator::Refresh()
         EST_pose = poses[data_count];
         cout<<EST_pose<<endl;
         pcl::transformPointCloud (*velo_cloud, *velo_cloud, EST_pose*cTv);
-    }    
-    (*merged_cloud) += (*velo_cloud); //merge point clouds
+    }         
+//    (*merged_cloud) += (*velo_cloud); //merge point clouds
+
+    if (data_count == 0){
+        (*cloud1) = (*velo_cloud);
+        merged_cloud->clear();
+        (*merged_cloud) = (*cloud1); 
+    }
+    else if(data_count==1){
+        (*cloud2) = (*velo_cloud);
+        merged_cloud->clear();
+        (*merged_cloud) = (*cloud1);
+        (*merged_cloud) += (*cloud2); 
+    }
+    else if(data_count==2){
+        (*cloud3) = (*velo_cloud); 
+        merged_cloud->clear();
+        (*merged_cloud) = (*cloud1);
+        (*merged_cloud) += (*cloud2); 
+        (*merged_cloud) += (*cloud3);  
+    }
+    else{
+        (*cloud1) = (*cloud2);        
+        (*cloud2) = (*cloud3);
+        (*cloud3) = (*velo_cloud);
+        merged_cloud->clear();
+        (*merged_cloud) = (*cloud1);
+        (*merged_cloud) += (*cloud2); 
+        (*merged_cloud) += (*cloud3);       
+    }
     //publish map and poses
     MapPub.PublishMap(merged_cloud,1);
     MapPub.PublishPose(poses[data_count],1);
     MapPub.PublishPose(EST_pose,3);
     cout<<"Map has been updated"<<endl;
- 
     data_count++;
 
 //    //save velodyne point clouds
@@ -43,8 +70,8 @@ void MapGenerator::Refresh()
 //    snprintf (str, 7, "%06d", data_count);
 //    fname = fname+str+".ply";
 //    pcl::io::savePLYFileASCII (fname.c_str(), *merged_cloud);
-    merged_cloud->clear();
-    (*merged_cloud) = (*velo_cloud);
+//    merged_cloud->clear();
+//    (*merged_cloud) = (*velo_cloud);
 
 
     //write poses
@@ -315,7 +342,7 @@ Matrix4f MapGenerator::Optimization(const pcl::PointCloud<pcl::PointXYZ>::Ptr& v
 
     }
     optimizer.initializeOptimization();
-    optimizer.optimize(5);
+    optimizer.optimize(100);
     
 
     // Recover optimized Sim3
