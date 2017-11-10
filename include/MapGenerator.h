@@ -57,10 +57,10 @@ public:
     MapGenerator(ros::NodeHandle node, ros::NodeHandle private_nh):
     resolution(1.0f), Nmin(10), Nsigma(3.0f), tmin(0.1f), tmax(1.0f), max_iter(50),
     velo_cloud(new pcl::PointCloud<pcl::PointXYZ>),
-    merged_cloud(new pcl::PointCloud<pcl::PointXYZ>),
-    data_count(0)
+    merged_cloud(new pcl::PointCloud<pcl::PointXYZ>)
     {
         private_nh.param("data_path", str_path_, std::string("/var/data/kitti/dataset/"));
+        private_nh.param("data_count", data_count, 0);
         this->nh = node;
         
         cTv = Matrix4f::Identity();
@@ -68,6 +68,33 @@ public:
         read_poses(str_path_+"poses/00.txt");
        
         EST_pose = Matrix4f::Identity();
+
+        if(data_count>0){
+            std::string fname;
+            char str[7];
+            snprintf (str, 7, "%06d", data_count);
+            fname = fname+str+".ply";
+            pcl::io::loadPLYFile<pcl::PointXYZ> (fname.c_str(), *merged_cloud); //* load the file
+
+
+	        ifstream file("poses.txt");
+            //skip N lines
+            string s;
+            for(int i = 0; i <3*(data_count-1); ++i)getline(file, s);
+            for(int i = 0; i <3; ++i){
+                getline(file, s, ' ');
+                EST_pose(i,0) = atof(s.c_str());
+                getline(file, s, ' ');
+                EST_pose(i,1) = atof(s.c_str());
+                getline(file, s, ' ');
+                EST_pose(i,2) = atof(s.c_str());
+                getline(file, s, '\n');
+                EST_pose(i,3) = atof(s.c_str());                
+            }
+            file.close();
+            cout<<"EST_pose!!"<<EST_pose<<endl;
+    
+        }
 
     }
 

@@ -37,16 +37,15 @@ void MapGenerator::Refresh()
  
     data_count++;
 
-//    if(data_count%5 == 0){   
-        //save velodyne point clouds
-        std::string fname;
-        char str[7];
-        snprintf (str, 7, "%06d", data_count);
-        fname = fname+str+".ply";
-        pcl::io::savePLYFileASCII (fname.c_str(), *merged_cloud);
-        merged_cloud->clear();
-        (*merged_cloud) = (*velo_cloud);
-//    }
+//    //save velodyne point clouds
+//    std::string fname;
+//    char str[7];
+//    snprintf (str, 7, "%06d", data_count);
+//    fname = fname+str+".ply";
+//    pcl::io::savePLYFileASCII (fname.c_str(), *merged_cloud);
+    merged_cloud->clear();
+    (*merged_cloud) = (*velo_cloud);
+
 
     //write poses
     ofstream poses_file("poses.txt", std::ios::app);
@@ -65,18 +64,6 @@ void MapGenerator::Refresh()
         poses_file << EST_pose(2,3) << '\n';
     }
     poses_file.close();
-
-//    float *data = (float*)malloc(12*sizeof(float));
-//    for (int32_t i=0; i<12; i++){
-//        int u = i/4;
-//        int v = i%4;
-//        float *px;
-//        px = data+i;
-//        *px = EST_pose(u,v);
-//    }
-//    poses_file = fopen ("poses.txt","wb");
-//    fwrite (data , sizeof(float), 12, poses_file);
-//    fclose (poses_file);
     
 }
 

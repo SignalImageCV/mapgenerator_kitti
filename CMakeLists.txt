@@ -31,7 +31,7 @@ catkin_package(DEPENDS OpenCV Eigen3
 ## Build ##
 ###########
 
-set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_BUILD_TYPE Release)
 
 include_directories(
     include
